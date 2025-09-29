@@ -2,15 +2,20 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/lucas-clemente/quic-go"
 	"github.com/yapingcat/gomedia/go-codec"
 	"github.com/yapingcat/gomedia/go-flv"
+	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -25,10 +30,40 @@ const (
 )
 
 var (
-	httpUrl *string = flag.String("url", "http://domain/stage/TestDelay20230426.flv", "The flv url to connect.")
+	httpUrl *string = flag.String("url", "http://domain/stage/TestDelay20230426.flv", "The rtmp url to connect.")
 	ip      *string = flag.String("ip", "1.1.1.1", "cdn ip")
 	port    *int    = flag.Int("port", 80, "port")
 )
+
+type NetConn struct {
+	QuicConn   quic.Connection
+	QuicStream quic.Stream
+}
+
+func (netConn *NetConn) Read(b []byte) (n int, err error) {
+	return netConn.QuicStream.Read(b)
+}
+func (netConn *NetConn) Write(b []byte) (n int, err error) {
+	return netConn.QuicStream.Write(b)
+}
+func (netConn *NetConn) Close() error {
+	return netConn.QuicStream.Close()
+}
+func (netConn *NetConn) LocalAddr() net.Addr {
+	return netConn.QuicConn.LocalAddr()
+}
+func (netConn *NetConn) RemoteAddr() net.Addr {
+	return netConn.QuicConn.RemoteAddr()
+}
+func (netConn *NetConn) SetDeadline(t time.Time) error {
+	return netConn.QuicStream.SetDeadline(t)
+}
+func (netConn *NetConn) SetReadDeadline(t time.Time) error {
+	return netConn.QuicStream.SetReadDeadline(t)
+}
+func (netConn *NetConn) SetWriteDeadline(t time.Time) error {
+	return netConn.QuicStream.SetWriteDeadline(t)
+}
 
 func main() {
 	flag.Usage = func() {
@@ -36,16 +71,39 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+	fmt.Printf("url:%v, ip:%v, port:%v\n", *httpUrl, *ip, *port)
+
+	url2, err := url.Parse(*httpUrl)
+	if err != nil {
+		log.Fatalf("url.Parse failed, err:%v", err)
+	}
+	domain := strings.Split(url2.Host, ":")[0]
 
 	roundTripper := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, network, fmt.Sprintf("%s:%d", *ip, *port))
+			conn, err := quic.DialAddrContext(ctx,
+				fmt.Sprintf("%s:%d", *ip, *port),
+				&tls.Config{
+					ServerName: domain,
+					NextProtos: []string{"http over quic"},
+				}, &quic.Config{
+					Versions: []quic.VersionNumber{quic.VersionDraft29},
+				})
+			if err != nil {
+				return nil, err
+			}
+			stream, err := conn.OpenStreamSync(ctx)
+			var netConn = &NetConn{
+				QuicConn:   conn,
+				QuicStream: stream,
+			}
+			return netConn, err
 		},
 	}
+
 	hclient := &http.Client{
 		Transport: roundTripper,
 	}
-
 	resp, err := hclient.Get(*httpUrl)
 	if err != nil {
 		fmt.Printf("http.Get err:%v\n", err)

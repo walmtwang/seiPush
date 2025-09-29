@@ -2,15 +2,20 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/lucas-clemente/quic-go"
+	"github.com/lucas-clemente/quic-go/http3"
 	"github.com/yapingcat/gomedia/go-codec"
 	"github.com/yapingcat/gomedia/go-flv"
-	"net"
+	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -25,7 +30,7 @@ const (
 )
 
 var (
-	httpUrl *string = flag.String("url", "http://domain/stage/TestDelay20230426.flv", "The flv url to connect.")
+	httpUrl *string = flag.String("url", "http://domain/stage/TestDelay20230426.flv", "The rtmp url to connect.")
 	ip      *string = flag.String("ip", "1.1.1.1", "cdn ip")
 	port    *int    = flag.Int("port", 80, "port")
 )
@@ -36,12 +41,27 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+	fmt.Printf("url:%v, ip:%v, port:%v\n", *httpUrl, *ip, *port)
 
-	roundTripper := &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, network, fmt.Sprintf("%s:%d", *ip, *port))
+	url2, err := url.Parse(*httpUrl)
+	if err != nil {
+		log.Fatalf("url.Parse failed, err:%v", err)
+	}
+	domain := strings.Split(url2.Host, ":")[0]
+
+	roundTripper := &http3.RoundTripper{
+		QuicConfig: &quic.Config{
+			Versions: []quic.VersionNumber{quic.VersionDraft29},
+		},
+		TLSClientConfig: &tls.Config{
+			ServerName: domain,
+			NextProtos: []string{"http over quic"},
+		},
+		Dial: func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (quic.EarlyConnection, error) {
+			return quic.DialAddrEarlyContext(ctx, fmt.Sprintf("%s:%d", *ip, *port), tlsCfg, cfg)
 		},
 	}
+	defer roundTripper.Close()
 	hclient := &http.Client{
 		Transport: roundTripper,
 	}

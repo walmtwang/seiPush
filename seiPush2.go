@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/yapingcat/gomedia/go-codec"
@@ -20,7 +19,7 @@ const (
 )
 
 var (
-	tcUrl       *string = flag.String("URL", "rtmp://domain/stage", "The rtmp url to connect.")
+	rtmpUrl     *string = flag.String("URL", "rtmp://domain/stage", "The rtmp url to connect.")
 	streamName  *string = flag.String("Stream", "StreamKey", "Stream name to play.")
 	flvFileName *string = flag.String("FLV", "./clock_av.flv", "FLV file to publishs.")
 )
@@ -158,24 +157,17 @@ func addSeiNalu(header *flv.TagHeader, data []byte) (*flv.TagHeader, []byte) {
 	return header, newData
 }
 
-type PushSei struct {
-	Ts     int64 `json:"ts"`
-	RealTs int64 `json:"real_ts"`
-}
-
 func buildSeiNalu() []byte {
-
-	nowTime := time.Now().UnixNano() / 1e6
-	seiInfo := PushSei{
-		Ts:     nowTime,
-		RealTs: nowTime,
-	}
-	seiBytes, _ := json.Marshal(seiInfo)
+	//unixTime := time.Now().UnixNano() / 1e6
+	//unixTimeBytes := Int64ToBytes(unixTime)
+	//unixTimeStr := strconv.FormatInt(unixTime, 10)
+	//unixTimeBytes := []byte(unixTimeStr)
+	seiBytes := []byte{0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2d, 0x54, 0x41, 0x4c, 0x42, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x03, 0x37, 0x38, 0x39, 0x00, 0x54, 0x50, 0x45, 0x31, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x03, 0x34, 0x35, 0x36, 0x00, 0x54, 0x49, 0x54, 0x32, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x03, 0x31, 0x32, 0x33, 0x00}
 
 	bs := codec.NewBitStream(seiBytes)
 
 	sei := &codec.SEI{}
-	sei.PayloadType = 100
+	sei.PayloadType = 0x05
 	sei.PayloadSize = uint16(len(seiBytes))
 	sei.Sei_payload = new(codec.UserDataUnregistered)
 	sei.Sei_payload.Read(sei.PayloadSize, bs)
@@ -208,7 +200,7 @@ func main() {
 	fmt.Println("to dial")
 	fmt.Println("a")
 	var err error
-	obConn, err = rtmp.Dial(*tcUrl, testHandler, 100)
+	obConn, err = rtmp.Dial(*rtmpUrl, testHandler, 100)
 	if err != nil {
 		fmt.Println("Dial error", err)
 		os.Exit(-1)
