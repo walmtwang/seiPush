@@ -20,7 +20,7 @@ const (
 )
 
 var (
-	tcUrl       *string = flag.String("URL", "rtmp://domain/stage", "The rtmp url to connect.")
+	url         *string = flag.String("URL", "rtmp://domain/stage", "The rtmp url to connect.")
 	streamName  *string = flag.String("Stream", "StreamKey", "Stream name to play.")
 	flvFileName *string = flag.String("FLV", "./clock_av.flv", "FLV file to publishs.")
 )
@@ -208,7 +208,7 @@ func main() {
 	fmt.Println("to dial")
 	fmt.Println("a")
 	var err error
-	obConn, err = rtmp.Dial(*tcUrl, testHandler, 100)
+	obConn, err = rtmp.Dial(*url, testHandler, 100)
 	if err != nil {
 		fmt.Println("Dial error", err)
 		os.Exit(-1)

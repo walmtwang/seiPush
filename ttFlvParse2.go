@@ -25,9 +25,9 @@ const (
 )
 
 var (
-	httpUrl *string = flag.String("url", "http://domain/stage/TestDelay20230426.flv", "The flv url to connect.")
-	ip      *string = flag.String("ip", "1.1.1.1", "cdn ip")
-	port    *int    = flag.Int("port", 80, "port")
+	url  *string = flag.String("url", "http://domain/stage/TestDelay20230426.flv", "The rtmp url to connect.")
+	ip   *string = flag.String("ip", "1.1.1.1", "cdn ip")
+	port *int    = flag.Int("port", 80, "port")
 )
 
 func main() {
@@ -46,7 +46,7 @@ func main() {
 		Transport: roundTripper,
 	}
 
-	resp, err := hclient.Get(*httpUrl)
+	resp, err := hclient.Get(*url)
 	if err != nil {
 		fmt.Printf("http.Get err:%v\n", err)
 		return

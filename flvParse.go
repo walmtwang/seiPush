@@ -11,14 +11,13 @@ import (
 	"strconv"
 	"time"
 )
-
 const (
 	programName = "FlvParse"
 	version     = "0.0.1"
 )
 
 var (
-	httpUrl *string = flag.String("URL", "http://domain/stage/TestDelay20230426.flv", "The rtmp url to connect.")
+	url *string = flag.String("URL", "http://domain/stage/TestDelay20230426.flv", "The rtmp url to connect.")
 )
 
 func main() {
@@ -28,7 +27,7 @@ func main() {
 	}
 	flag.Parse()
 
-	resp, err := http.Get(*httpUrl)
+	resp, err := http.Get(*url)
 	if err != nil {
 		fmt.Printf("http.Get err:%v\n", err)
 		return
